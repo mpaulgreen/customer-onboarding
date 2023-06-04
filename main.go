@@ -1,5 +1,11 @@
 package main
 
+import (
+	"customer-onboarding/models"
+	"customer-onboarding/servicenow"
+	"io/ioutil"
+)
+
 func main() {
 	//router.SetUpRoutes()
 	//err := http.ListenAndServe(":3000", nil)
@@ -49,14 +55,14 @@ func main() {
 	//b, _ := json.Marshal(incident)
 	//println("From Main", string(b))
 
-	//content, _ := ioutil.ReadFile("foo.yaml")
-	//println(string(content))
-	//err := servicenow.AddAttachment(&models.Attachment{
-	//	IncidentNumber: "INC0010018",
-	//	Content:        content,
-	//	FileName:       "foo.yaml",
-	//})
-	//if err != nil {
-	//	println("Attachment not added")
-	//}
+	content, _ := ioutil.ReadFile("foo.yaml")
+	println(string(content))
+	err := servicenow.AddAttachment(&models.Attachment{
+		IncidentNumber: "INC0010032",
+		Content:        content,
+		FileName:       "foo.yaml",
+	})
+	if err != nil {
+		println("Attachment not added")
+	}
 }

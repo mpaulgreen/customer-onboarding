@@ -15,23 +15,10 @@ import (
 	"strings"
 )
 
-const (
-	SERVICENOW      string = "https://dev124376.service-now.com"
-	ACCESSTOKENPATH string = "/oauth_token.do"
-	GROUPSPATH      string = "/api/now/table/sys_user_group"
-	USERSPATH       string = "/api/now/table/sys_user"
-
-	INCIDENTSPATH string = "/api/now/table/incident"
-
-	ATTACHMENTPATH = "/api/now/attachment/file"
-)
-
-func getHttpClient() http.Client {
-	return http.Client{}
-}
 func GetAccessToken(client models.Client) (*models.AccessToken, error) {
 	var accessToken models.AccessToken
 
+	// set up the client credentials
 	clientRequest := url.Values{}
 	clientRequest.Set("client_id", client.ClientId)
 	clientRequest.Set("client_secret", client.ClientSecret)
@@ -39,61 +26,51 @@ func GetAccessToken(client models.Client) (*models.AccessToken, error) {
 	clientRequest.Set("password", client.Password)
 	clientRequest.Set("grant_type", client.GrantType)
 
-	servicenow := SERVICENOW + ACCESSTOKENPATH
+	servicenow := URL + ACCESSTOKEN_PATH
+
+	// call to service now to get the access token
 	httpResponse, error := (&http.Client{}).PostForm(servicenow, clientRequest)
 	if error != nil {
-		log.Println("Error in calling service now to get the token", error)
-		return &accessToken, error
+		log.Println("networking: could not retrieve the access token from service now", error)
+		return &accessToken, errors.New("networking: could not retrieve the access token from service now")
 	}
+
 	if httpResponse.StatusCode == http.StatusOK {
 		jsonToken, err := io.ReadAll(httpResponse.Body)
 		if err != nil {
-			log.Println(err)
-			return &accessToken, err
+			log.Println("system: Error while parsing JSON token", err)
+			return &accessToken, errors.New("system: Error while parsing JSON token")
 		}
 
 		err = json.Unmarshal(jsonToken, &accessToken)
 		if err != nil {
-			log.Println("Error in unmarshalling json token", err)
-			return &accessToken, err
+			log.Println("system: Error while unmarshalling json token", err)
+			return &accessToken, errors.New("system: Error while unmarshalling json token")
 		}
 		return &accessToken, nil
 	} else {
 		errorResponse, _ := io.ReadAll(httpResponse.Body)
-		log.Println("Bad Token", errorResponse)
+		log.Println("business: No Token ", httpResponse.StatusCode, " ", string(errorResponse))
+		return &accessToken, errors.New(
+			fmt.Sprintf("business: No Token %s %s", httpResponse.StatusCode, string(errorResponse)))
 	}
 
 	return &accessToken, nil
 }
 func GetGroupByName(accessToken, name string) (*models.Group, error) {
-
 	var group models.Group
-	//client := models.Client{
-	//	ClientId:     "63a59937dccfa5108277140ed7efa4ca",
-	//	ClientSecret: "8&E0^7``mm",
-	//	UserName:     "fedramp",
-	//	Password:     "Redhat123",
-	//	GrantType:    "password",
-	//}
-	//token, _ := GetAccessToken(client)
-	////b, _ := json.Marshal(token)
-	////println(string(b))
-	//
-	// TODO: The above code needs to be removed
-
 	params := url.Values{}
 	paramValue := "name=" + name
 	params.Add("sysparm_query", paramValue)
-	u, _ := url.ParseRequestURI(SERVICENOW)
-	groupspath := GROUPSPATH
-	u.Path = groupspath
+	u, _ := url.ParseRequestURI(URL)
+	u.Path = GROUPS_PATH
 	u.RawQuery = params.Encode()
 	urlStr := fmt.Sprintf("%v", u)
 	request, error := http.NewRequest(http.MethodGet, urlStr, nil)
+
 	if error != nil {
-		println(" Error in creating request")
-		log.Println("Error in creating request", error)
-		return nil, error
+		log.Println("system: http request to query group could not be created", error)
+		return nil, errors.New("system: http request to query group could not be created")
 	}
 
 	bearer := "Bearer " + accessToken
@@ -102,30 +79,34 @@ func GetGroupByName(accessToken, name string) (*models.Group, error) {
 	httpResponse, err := (&http.Client{}).Do(request)
 
 	if err != nil {
-		println(" Error in calling service now to get the group")
-		log.Println("Error in calling service now to get the group", error)
-		return &group, error
+		log.Println("networking: could not retrieve group from service now", error)
+		return &group, errors.New("networking: could not retrieve group from service now")
 	}
+
 	if httpResponse.StatusCode == http.StatusOK {
 		jsonGroup, err := io.ReadAll(httpResponse.Body)
-		//println(" jsonGroupBody", string(jsonGroup))
 		if err != nil {
-			log.Println(err)
-			return &group, err
+			log.Println("system: Error while parsing response body", err)
+			return &group, errors.New("system: Error while parsing response body")
 		}
-		//println(string(jsonGroup))
+
 		err = json.Unmarshal(jsonGroup, &group)
 
 		if err != nil {
-			//println("Error in unmarshalling json token", err)
-			log.Println("Error in unmarshalling json token", err)
-			return &group, err
+			log.Println("system: Error while unmarshalling response body", err)
+			return &group, errors.New("system: Error while unmarshalling response body")
 		}
 
+		if len(group.Result) > 1 {
+			log.Println("business: More than one group for onboarding")
+			return &group, errors.New("business: More than one group for onboarding")
+		}
 		return &group, nil
 	} else {
 		errorResponse, _ := io.ReadAll(httpResponse.Body)
-		log.Println("Bad Group", errorResponse)
+		log.Println("business: no group received ", httpResponse.StatusCode, " ", string(errorResponse))
+		return &group, errors.New(
+			fmt.Sprintf("business: no group received %s %s", httpResponse.StatusCode, string(errorResponse)))
 	}
 
 	return &group, nil
@@ -133,30 +114,16 @@ func GetGroupByName(accessToken, name string) (*models.Group, error) {
 
 func GetUserByName(accessToken, name string) (*models.User, error) {
 	var user models.User
-	//client := models.Client{
-	//	ClientId:     "63a59937dccfa5108277140ed7efa4ca",
-	//	ClientSecret: "8&E0^7``mm",
-	//	UserName:     "fedramp",
-	//	Password:     "Redhat123",
-	//	GrantType:    "password",
-	//}
-	//token, _ := GetAccessToken(client)
-	//b, _ := json.Marshal(token)
-	//println(string(b))
-
-	// TODO: The above code needs to be removed
-
 	params := url.Values{}
 	params.Add("user_name", name)
-	u, _ := url.ParseRequestURI(SERVICENOW)
-	userspath := USERSPATH
-	u.Path = userspath
+	u, _ := url.ParseRequestURI(URL)
+	u.Path = USERS_PATH
 	u.RawQuery = params.Encode()
 	urlStr := fmt.Sprintf("%v", u)
 	request, error := http.NewRequest(http.MethodGet, urlStr, nil)
 	if error != nil {
-		log.Println("Error in creating request", error)
-		return nil, error
+		log.Println("system: http request to query user could not be created", error)
+		return nil, errors.New("system: http request to query user could not be created")
 	}
 
 	bearer := "Bearer " + accessToken
@@ -165,30 +132,35 @@ func GetUserByName(accessToken, name string) (*models.User, error) {
 	httpResponse, err := (&http.Client{}).Do(request)
 
 	if err != nil {
-		println(" Error in calling service now to get the user")
-		log.Println("Error in calling service now to get the user", error)
-		return &user, error
+		log.Println("networking: could not retrieve user from service now", error)
+		return &user, errors.New("networking: could not retrieve user from service now")
 	}
+
 	if httpResponse.StatusCode == http.StatusOK {
 		jsonGroup, err := io.ReadAll(httpResponse.Body)
-		//println(" jsonGroupBody", string(jsonGroup))
+
 		if err != nil {
-			log.Println(err)
-			return &user, err
+			log.Println("system: Error while parsing response body", err)
+			return &user, errors.New("system: Error while parsing response body")
 		}
 		//println(string(jsonGroup))
 		err = json.Unmarshal(jsonGroup, &user)
 
 		if err != nil {
-			//println("Error in unmarshalling json token", err)
-			log.Println("Error in unmarshalling json token", err)
-			return &user, err
+			log.Println("system: Error while unmarshalling response body", err)
+			return &user, errors.New("system: Error while unmarshalling response body")
 		}
 
+		if len(user.Result) > 1 {
+			log.Println("business: system user name in service now needs to be unique", err)
+			return &user, errors.New("business: system user name in service now needs to be unique")
+		}
 		return &user, nil
 	} else {
 		errorResponse, _ := io.ReadAll(httpResponse.Body)
-		log.Println("Bad User", errorResponse)
+		log.Println("business: no user received ", httpResponse.StatusCode, " ", string(errorResponse))
+		return &user, errors.New(
+			fmt.Sprintf("business: no user received %s %s", httpResponse.StatusCode, string(errorResponse)))
 	}
 
 	return &user, nil
@@ -196,32 +168,17 @@ func GetUserByName(accessToken, name string) (*models.User, error) {
 
 func GetIncidentByNumber(accessToken, number string) (*models.Incident, error) {
 	var incident models.Incident
-	//client := models.Client{
-	//	ClientId:     "63a59937dccfa5108277140ed7efa4ca",
-	//	ClientSecret: "8&E0^7``mm",
-	//	UserName:     "fedramp",
-	//	Password:     "Redhat123",
-	//	GrantType:    "password",
-	//}
-	//token, _ := GetAccessToken(client)
-	//b, _ := json.Marshal(token)
-	//println(string(b))
-
-	// TODO: The above code needs to be removed
-
 	params := url.Values{}
 	paramValue := "number=" + number
 	params.Add("sysparm_query", paramValue)
-	u, _ := url.ParseRequestURI(SERVICENOW)
-	groupspath := INCIDENTSPATH
-	u.Path = groupspath
+	u, _ := url.ParseRequestURI(URL)
+	u.Path = INCIDENTS_PATH
 	u.RawQuery = params.Encode()
 	urlStr := fmt.Sprintf("%v", u)
 	request, error := http.NewRequest(http.MethodGet, urlStr, nil)
 	if error != nil {
-		println(" Error in creating request")
-		log.Println("Error in creating request", error)
-		return nil, error
+		log.Println("system: http request to query incident could not be created", error)
+		return nil, errors.New("system: http request to query incident could not be created")
 	}
 
 	bearer := "Bearer " + accessToken
@@ -230,30 +187,35 @@ func GetIncidentByNumber(accessToken, number string) (*models.Incident, error) {
 	httpResponse, err := (&http.Client{}).Do(request)
 
 	if err != nil {
-		println(" Error in calling service now to get the group")
-		log.Println("Error in calling service now to get the group", error)
-		return &incident, error
+		log.Println("networking: could not retrieve incident from service now", error)
+		return &incident, errors.New("networking: could not retrieve incident from service now")
 	}
+
 	if httpResponse.StatusCode == http.StatusOK {
 		jsonGroup, err := io.ReadAll(httpResponse.Body)
-		//println(" jsonGroupBody", string(jsonGroup))
 		if err != nil {
-			log.Println(err)
-			return &incident, err
+			log.Println("system: Error while parsing response body", err)
+			return &incident, errors.New("system: Error while parsing response body")
 		}
-		//println(string(jsonGroup))
+
 		err = json.Unmarshal(jsonGroup, &incident)
 
 		if err != nil {
-			//println("Error in unmarshalling json token", err)
-			log.Println("Error in unmarshalling json token", err)
-			return &incident, err
+			log.Println("system: Error while unmarshalling response body", err)
+			return &incident, errors.New("system: Error while unmarshalling response body")
+		}
+
+		if len(incident.Result) > 1 {
+			log.Println("business: incident number in service now is expected to be unique", err)
+			return &incident, errors.New("incident number in service now is expected to be unique")
 		}
 
 		return &incident, nil
 	} else {
 		errorResponse, _ := io.ReadAll(httpResponse.Body)
-		log.Println("Bad Incident", errorResponse)
+		log.Println("business: No incident received ", httpResponse.StatusCode, " ", string(errorResponse))
+		return &incident, errors.New(
+			fmt.Sprintf("business: No incident received %s %s", httpResponse.StatusCode, string(errorResponse)))
 	}
 
 	return &incident, nil
@@ -264,22 +226,20 @@ func CreateIncident(serviceNowIncident *models.ServiceNowIncident) (*models.Inci
 	var group *models.Group
 	var user *models.User
 	client := models.Client{
-		ClientId:     "63a59937dccfa5108277140ed7efa4ca",
-		ClientSecret: "8&E0^7``mm",
-		UserName:     "fedramp",
-		Password:     "Redhat123",
+		ClientId:     CLIENT_ID,
+		ClientSecret: CLIENT_SECRET,
+		UserName:     USER_NAME,
+		Password:     PASSWORD,
 		GrantType:    "password",
 	}
 	token, _ := GetAccessToken(client)
-	//b, _ := json.Marshal(token)
-	//println(string(b))
-
 	if strings.TrimSpace(serviceNowIncident.AssignedGroupName) != "" {
 		var error = errors.New("")
 		group, error = GetGroupByName(token.Token, serviceNowIncident.AssignedGroupName)
 		if error != nil {
-			log.Println("Error in Getting Group from Service Now", error)
-			return nil, error
+			log.Println("business: Cannot find the group for onboarding", error)
+			return nil, errors.New(
+				fmt.Sprintf("business: Cannot find the group for onboarding %s", error))
 		}
 	}
 
@@ -287,8 +247,9 @@ func CreateIncident(serviceNowIncident *models.ServiceNowIncident) (*models.Inci
 		var error = errors.New("")
 		user, error = GetUserByName(token.Token, serviceNowIncident.CallerName)
 		if error != nil {
-			log.Println("Error in Getting User from Service Now", error)
-			return nil, error
+			log.Println("business: Cannot find the user for onboarding", error)
+			return nil, errors.New(
+				fmt.Sprintf("business: Cannot find the user for onboarding %s", error))
 		}
 	}
 
@@ -301,16 +262,17 @@ func CreateIncident(serviceNowIncident *models.ServiceNowIncident) (*models.Inci
 	}
 
 	jsonIncident, error := json.Marshal(serviceNowIncident)
+
 	if error != nil {
-		fmt.Println("Error in Marshalling service now incident", error)
+		log.Println("system: error while marshalling incident", error)
+		return &incident, errors.New("system: error while marshalling incident")
 	}
 
-	urlStr := SERVICENOW + INCIDENTSPATH
+	urlStr := URL + INCIDENTS_PATH
 	request, error := http.NewRequest(http.MethodPost, urlStr, bytes.NewReader(jsonIncident))
 	if error != nil {
-		println(" Error in creating request")
-		log.Println("Error in creating request", error)
-		return nil, error
+		log.Println("system: http request to create incident could not be created", error)
+		return nil, errors.New("system: http request to create incident could not be created")
 	}
 
 	bearer := "Bearer " + token.Token
@@ -319,43 +281,41 @@ func CreateIncident(serviceNowIncident *models.ServiceNowIncident) (*models.Inci
 	httpResponse, err := (&http.Client{}).Do(request)
 
 	if err != nil {
-		println(" Error in calling service now to get the group")
-		log.Println("Error in calling service now to get the group", error)
-		return &incident, error
+		log.Println("networking: could not create incident in service now", error)
+		return &incident, errors.New("networking: could not create incident in service now")
 	}
 	if httpResponse.StatusCode == http.StatusCreated {
 		jsonIncident, err := io.ReadAll(httpResponse.Body)
 		if err != nil {
-			log.Println(err)
-			return &incident, err
+			log.Println("system: Error while parsing response body", err)
+			return &incident, errors.New("system: Error while parsing response body")
 		}
-		println(string(jsonIncident))
 
 		err = json.Unmarshal(jsonIncident, &incident)
 
 		if err != nil {
-			println("Error in unmarshalling json incident", err)
-			log.Println("Error in unmarshalling json incident", err)
-			return &incident, err
+			log.Println("system: Error while unmarshalling response body", err)
+			return &incident, errors.New("system: Error while unmarshalling response body")
 		}
 
 		return &incident, nil
 	} else {
 		errorResponse, _ := io.ReadAll(httpResponse.Body)
-		log.Println("Bad Incident Creation", string(errorResponse))
+		log.Println("business: No incident could be created ", httpResponse.StatusCode, " ", string(errorResponse))
+		return &incident, errors.New(
+			fmt.Sprintf("business: No incident could be created %s %s", httpResponse.StatusCode, string(errorResponse)))
 	}
 
 	return &incident, nil
 }
 
 func AddAttachment(attachment *models.Attachment) error {
-
 	var incident *models.Incident
 	client := models.Client{
-		ClientId:     "63a59937dccfa5108277140ed7efa4ca",
-		ClientSecret: "8&E0^7``mm",
-		UserName:     "fedramp",
-		Password:     "Redhat123",
+		ClientId:     CLIENT_ID,
+		ClientSecret: CLIENT_SECRET,
+		UserName:     USER_NAME,
+		Password:     PASSWORD,
 		GrantType:    "password",
 	}
 	token, _ := GetAccessToken(client)
@@ -366,31 +326,33 @@ func AddAttachment(attachment *models.Attachment) error {
 		var error = errors.New("")
 		incident, error = GetIncidentByNumber(token.Token, attachment.IncidentNumber)
 		if error != nil {
-			log.Println("Error in Getting Incident from Service Now", error)
-			return error
+			log.Println("business: Cannot find the incident to attach the file", error)
+			return errors.New(
+				fmt.Sprintf("business: Cannot find the incident to attach the file %s", error))
 		}
+
+		if len(incident.Result) > 1 {
+			log.Println("business: More than one incident for onboarding")
+			return errors.New("business: More than one incident for onboarding")
+		}
+
 	} else {
-		return errors.New("incident number not specified")
+		return errors.New("business: Incident number is required for attaching the file")
 	}
 
 	params := url.Values{}
-	paramValue1 := "incident"
-	paramValue2 := (*incident).Result[0].ID
-	paramValue3 := attachment.FileName
-	params.Add("table_name", paramValue1)
-	params.Add("table_sys_id", paramValue2)
-	params.Add("file_name", paramValue3)
-	u, _ := url.ParseRequestURI(SERVICENOW)
-	atttachmentPath := ATTACHMENTPATH
-	u.Path = atttachmentPath
+	params.Add("table_name", "incident")
+	params.Add("table_sys_id", (*incident).Result[0].ID)
+	params.Add("file_name", attachment.FileName)
+	u, _ := url.ParseRequestURI(URL)
+	u.Path = ATTACHMENT_PATH
 	u.RawQuery = params.Encode()
 	urlStr := fmt.Sprintf("%v", u)
 
 	request, error := http.NewRequest(http.MethodPost, urlStr, bytes.NewReader(attachment.Content))
 	if error != nil {
-		println(" Error in creating request")
-		log.Println("Error in creating request", error)
-		return error
+		log.Println("system: http request to add attachment to incident could not created", error)
+		return errors.New("system: http request to add attachment to incident could not created")
 	}
 
 	bearer := "Bearer " + token.Token
@@ -399,21 +361,22 @@ func AddAttachment(attachment *models.Attachment) error {
 	httpResponse, err := (&http.Client{}).Do(request)
 
 	if err != nil {
-		println(" Error in calling service now to get the group")
-		log.Println("Error in calling service now to attach the attachment to incident", error)
-		return error
+		log.Println("networking: could not add attachment to the incident", err)
+		return errors.New("networking: could not add attachment to the incident")
 	}
 	if httpResponse.StatusCode == http.StatusCreated {
 		_, err := io.ReadAll(httpResponse.Body)
 		if err != nil {
-			log.Println(err)
-			return err
+			log.Println("system: Error while parsing the response body", err)
+			return errors.New("system: Error while parsing the response body")
 		}
 
 		return nil
 	} else {
 		errorResponse, _ := io.ReadAll(httpResponse.Body)
-		log.Println("Bad Attachment Creation", string(errorResponse))
+		log.Println("business: no attachment created ", httpResponse.StatusCode, " ", string(errorResponse))
+		return errors.New(
+			fmt.Sprintf("business: no attachment created %s %s", httpResponse.StatusCode, string(errorResponse)))
 	}
 
 	return nil
