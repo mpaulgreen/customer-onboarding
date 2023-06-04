@@ -19,3 +19,10 @@
 	"contact_type":       "mpaul@redhat.com"
 }
 ```
+
+# /upload
+```agsl
+curl --location --request POST 'http://localhost:3000/upload?file_name=foo.yaml&number=INC0010036' \
+--header 'Content-Type: text/yaml' \
+--data-binary '@/Users/mrigankapaul/Downloads/foo.yaml'
+```
