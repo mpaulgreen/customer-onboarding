@@ -6,8 +6,6 @@ import (
 )
 
 func SetUpRoutes() {
-	groupsHandler := http.HandlerFunc(handlers.GroupsHandler)
-	usersHandler := http.HandlerFunc(handlers.UsersHandler)
-	http.Handle("/groups/", groupsHandler)
-	http.Handle("/users/", usersHandler)
+	incidentHandler := http.HandlerFunc(handlers.IncidentHandler)
+	http.Handle("/incidents", incidentHandler)
 }

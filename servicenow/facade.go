@@ -1,7 +1,5 @@
 package servicenow
 
-// TODO: Major refactoring required for the facade
-
 import (
 	"bytes"
 	"customer-onboarding/models"
@@ -243,9 +241,9 @@ func CreateIncident(serviceNowIncident *models.ServiceNowIncident) (*models.Inci
 		}
 	}
 
-	if strings.TrimSpace(serviceNowIncident.CallerName) != "" {
+	if strings.TrimSpace(serviceNowIncident.CallerId) != "" {
 		var error = errors.New("")
-		user, error = GetUserByName(token.Token, serviceNowIncident.CallerName)
+		user, error = GetUserByName(token.Token, serviceNowIncident.CallerId)
 		if error != nil {
 			log.Println("business: Cannot find the user for onboarding", error)
 			return nil, errors.New(
@@ -254,11 +252,11 @@ func CreateIncident(serviceNowIncident *models.ServiceNowIncident) (*models.Inci
 	}
 
 	if group != nil {
-		serviceNowIncident.AssignedGroupName = (*group).Result[0].ID // TODO
+		serviceNowIncident.AssignedGroupName = (*group).Result[0].ID
 	}
 
 	if user != nil {
-		serviceNowIncident.CallerName = (*user).Result[0].ID // TODO
+		serviceNowIncident.CallerId = (*user).Result[0].ID
 	}
 
 	jsonIncident, error := json.Marshal(serviceNowIncident)
