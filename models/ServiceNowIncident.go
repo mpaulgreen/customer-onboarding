@@ -6,6 +6,6 @@ type ServiceNowIncident struct {
 	Impact            string `json:"impact,omitempty"`
 	Description       string `json:"description,omitempty"`
 	ContactType       string `json:"contact_type,omitempty"`
-	CallerName        string `json:"caller_name,omitempty"` // optional
-	AssignedGroupName string `json:"group_name,omitempty"`  // optional
+	CallerName        string `json:"caller_id,omitempty"`        // optional
+	AssignedGroupName string `json:"assignment_group,omitempty"` // optional
 }
