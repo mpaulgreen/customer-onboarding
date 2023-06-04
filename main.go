@@ -1,11 +1,5 @@
 package main
 
-import (
-	"customer-onboarding/models"
-	"customer-onboarding/servicenow"
-	"encoding/json"
-)
-
 func main() {
 	//router.SetUpRoutes()
 	//err := http.ListenAndServe(":3000", nil)
@@ -42,16 +36,27 @@ func main() {
 	//b, _ := json.Marshal(group)
 	//println("From Main", string(b))
 
-	incident, _ := servicenow.CreateIncident(&models.ServiceNowIncident{
-		ShortDescription:  "Sample Incident",
-		Urgency:           "2",
-		Impact:            "2",
-		Description:       "Please oboard customer foo, admin: firstName: John, lastName: Doe,email: John.Doe@gmail.com, ClientId: foo, ClientSecret: xxxxxxxx,Discovery Endpoint: https://accounts.google.com/.well-known/openid-configuration",
-		ContactType:       "mpaul@redhat.com",
-		CallerName:        "survey.user",
-		AssignedGroupName: "Onboarding",
-	})
+	//incident, _ := servicenow.CreateIncident(&models.ServiceNowIncident{
+	//	ShortDescription:  "Sample Incident",
+	//	Urgency:           "2",
+	//	Impact:            "2",
+	//	Description:       "Please oboard customer foo, admin: firstName: John, lastName: Doe,email: John.Doe@gmail.com, ClientId: foo, ClientSecret: xxxxxxxx,Discovery Endpoint: https://accounts.google.com/.well-known/openid-configuration",
+	//	ContactType:       "mpaul@redhat.com",
+	//	CallerName:        "survey.user",
+	//	AssignedGroupName: "Onboarding",
+	//})
+	//
+	//b, _ := json.Marshal(incident)
+	//println("From Main", string(b))
 
-	b, _ := json.Marshal(incident)
-	println("From Main", string(b))
+	//content, _ := ioutil.ReadFile("foo.yaml")
+	//println(string(content))
+	//err := servicenow.AddAttachment(&models.Attachment{
+	//	IncidentNumber: "INC0010018",
+	//	Content:        content,
+	//	FileName:       "foo.yaml",
+	//})
+	//if err != nil {
+	//	println("Attachment not added")
+	//}
 }

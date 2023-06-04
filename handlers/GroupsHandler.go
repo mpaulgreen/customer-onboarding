@@ -11,6 +11,7 @@ import (
 
 const GroupsPath = "groups"
 
+// TODO: This will be the hanlder for /incidents
 func GroupsHandler(w http.ResponseWriter, r *http.Request) {
 	println("Inside Groups handler")
 	urlPathSegments := strings.Split(r.URL.Path, fmt.Sprintf("%s/", GroupsPath))

@@ -11,6 +11,7 @@ import (
 
 const UsersPath = "users"
 
+// TODO: This will be the handler for /file
 func UsersHandler(w http.ResponseWriter, r *http.Request) {
 	urlPathSegments := strings.Split(r.URL.Path, fmt.Sprintf("%s/", UsersPath))
 	if len(urlPathSegments[1:]) > 1 {

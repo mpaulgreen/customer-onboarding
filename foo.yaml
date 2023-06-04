@@ -1,0 +1,8 @@
+- name: foo
+- admin:
+    - firstName: John
+    - lastName: Doe
+    - email: John.Doe@gmail.com
+- ClientId: foo // only if the customer has an IDP
+- ClientSecret: xxxxxxxx // only if the customer has an IDP
+- Discovery Endpoint: https://accounts.google.com/.well-known/openid-configuration

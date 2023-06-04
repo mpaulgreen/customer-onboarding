@@ -1,5 +1,7 @@
 package servicenow
 
+// TODO: Major refactoring required for the facade
+
 import (
 	"bytes"
 	"customer-onboarding/models"
@@ -20,6 +22,8 @@ const (
 	USERSPATH       string = "/api/now/table/sys_user"
 
 	INCIDENTSPATH string = "/api/now/table/incident"
+
+	ATTACHMENTPATH = "/api/now/attachment/file"
 )
 
 func getHttpClient() http.Client {
@@ -190,16 +194,16 @@ func GetUserByName(accessToken, name string) (*models.User, error) {
 	return &user, nil
 }
 
-func GetIncidentByNumber(number string) (*models.Incident, error) {
+func GetIncidentByNumber(accessToken, number string) (*models.Incident, error) {
 	var incident models.Incident
-	client := models.Client{
-		ClientId:     "63a59937dccfa5108277140ed7efa4ca",
-		ClientSecret: "8&E0^7``mm",
-		UserName:     "fedramp",
-		Password:     "Redhat123",
-		GrantType:    "password",
-	}
-	token, _ := GetAccessToken(client)
+	//client := models.Client{
+	//	ClientId:     "63a59937dccfa5108277140ed7efa4ca",
+	//	ClientSecret: "8&E0^7``mm",
+	//	UserName:     "fedramp",
+	//	Password:     "Redhat123",
+	//	GrantType:    "password",
+	//}
+	//token, _ := GetAccessToken(client)
 	//b, _ := json.Marshal(token)
 	//println(string(b))
 
@@ -220,7 +224,7 @@ func GetIncidentByNumber(number string) (*models.Incident, error) {
 		return nil, error
 	}
 
-	bearer := "Bearer " + token.Token
+	bearer := "Bearer " + accessToken
 	request.Header.Set("Authorization", bearer)
 	request.Header.Set("content-type", "application/json")
 	httpResponse, err := (&http.Client{}).Do(request)
@@ -344,8 +348,73 @@ func CreateIncident(serviceNowIncident *models.ServiceNowIncident) (*models.Inci
 	return &incident, nil
 }
 
-func AddAttachment(attachment *models.Attachment) (models.Attachment, error) {
-	// TODO: Implementation pending
-	// REST call to service now
-	return models.Attachment{}, nil
+func AddAttachment(attachment *models.Attachment) error {
+
+	var incident *models.Incident
+	client := models.Client{
+		ClientId:     "63a59937dccfa5108277140ed7efa4ca",
+		ClientSecret: "8&E0^7``mm",
+		UserName:     "fedramp",
+		Password:     "Redhat123",
+		GrantType:    "password",
+	}
+	token, _ := GetAccessToken(client)
+
+	// Get the Incident ID from Incident number
+
+	if strings.TrimSpace(attachment.IncidentNumber) != "" {
+		var error = errors.New("")
+		incident, error = GetIncidentByNumber(token.Token, attachment.IncidentNumber)
+		if error != nil {
+			log.Println("Error in Getting Incident from Service Now", error)
+			return error
+		}
+	} else {
+		return errors.New("incident number not specified")
+	}
+
+	params := url.Values{}
+	paramValue1 := "incident"
+	paramValue2 := (*incident).Result[0].ID
+	paramValue3 := attachment.FileName
+	params.Add("table_name", paramValue1)
+	params.Add("table_sys_id", paramValue2)
+	params.Add("file_name", paramValue3)
+	u, _ := url.ParseRequestURI(SERVICENOW)
+	atttachmentPath := ATTACHMENTPATH
+	u.Path = atttachmentPath
+	u.RawQuery = params.Encode()
+	urlStr := fmt.Sprintf("%v", u)
+
+	request, error := http.NewRequest(http.MethodPost, urlStr, bytes.NewReader(attachment.Content))
+	if error != nil {
+		println(" Error in creating request")
+		log.Println("Error in creating request", error)
+		return error
+	}
+
+	bearer := "Bearer " + token.Token
+	request.Header.Set("Authorization", bearer)
+	request.Header.Set("content-type", "application/json")
+	httpResponse, err := (&http.Client{}).Do(request)
+
+	if err != nil {
+		println(" Error in calling service now to get the group")
+		log.Println("Error in calling service now to attach the attachment to incident", error)
+		return error
+	}
+	if httpResponse.StatusCode == http.StatusCreated {
+		_, err := io.ReadAll(httpResponse.Body)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+
+		return nil
+	} else {
+		errorResponse, _ := io.ReadAll(httpResponse.Body)
+		log.Println("Bad Attachment Creation", string(errorResponse))
+	}
+
+	return nil
 }
